@@ -26,16 +26,16 @@
 
 ```text
 .
-├── vol3-memory-analysis/
-│   ├── SKILL.md
-│   ├── agents/openai.yaml
-│   ├── references/
-│   │   ├── plugins.md
-│   │   ├── symbols.md
-│   │   └── workflows.md
-│   └── scripts/
-│       ├── resolve_vol3_symbol.py
-│       └── debian_snapshot_symbol_cmd.py
+├── SKILL.md
+├── agents/openai.yaml
+├── references/
+│   ├── plugins.md
+│   ├── symbols.md
+│   └── workflows.md
+├── scripts/
+│   ├── init_workspace.py
+│   ├── resolve_vol3_symbol.py
+│   └── debian_snapshot_symbol_cmd.py
 ├── images/                 # 默认内存镜像目录，不提交 Git
 ├── symbols/linux/          # Linux ISF 符号目录，不提交 Git
 ├── results/                # 明确要求导出时的默认结果目录
@@ -47,13 +47,13 @@
 首次克隆仓库后，运行初始化脚本创建默认工作目录：
 
 ```bash
-python3 vol3-memory-analysis/scripts/init_workspace.py
+python3 scripts/init_workspace.py
 ```
 
 也可以指定其他工作区根目录：
 
 ```bash
-python3 vol3-memory-analysis/scripts/init_workspace.py --root /path/to/workspace
+python3 scripts/init_workspace.py --root /path/to/workspace
 ```
 
 脚本会创建：
@@ -94,14 +94,31 @@ find
 
 ## 安装 Skill
 
-可以将 skill 软链接到 Codex skill 目录：
+仓库根目录就是标准 Skill 目录，因此可以直接在 Codex 中输入：
+
+```text
+给我安装这个skill到codex，https://github.com/Liuxunzhang/vol3-skill.git
+```
+
+也可以手动运行 Codex 官方安装器：
+
+```bash
+python3 ~/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py \
+  --repo Liuxunzhang/vol3-skill \
+  --path . \
+  --name vol3-memory-analysis
+```
+
+本地开发时，可以将仓库根目录软链接到 Codex skill 目录：
 
 ```bash
 mkdir -p ~/.codex/skills
-ln -s "$(pwd)/vol3-memory-analysis" ~/.codex/skills/vol3-memory-analysis
+ln -s "$(pwd)" ~/.codex/skills/vol3-memory-analysis
 ```
 
 已经存在同名目录时，不要直接覆盖；先确认其内容和来源。
+
+安装后需要重启 Codex，使新 Skill 被加载。
 
 安装后可以在对话中明确调用：
 
@@ -176,7 +193,7 @@ Linux 镜像首先获取 banner：
 已知完整文件名时：
 
 ```bash
-python3 vol3-memory-analysis/scripts/resolve_vol3_symbol.py \
+python3 scripts/resolve_vol3_symbol.py \
   --filename 'KaliLinux_6.9.11-rt-amd64_6.9.11-1kali1_amd64.json.xz' \
   --symbols-dir ./symbols/linux \
   --download
@@ -185,7 +202,7 @@ python3 vol3-memory-analysis/scripts/resolve_vol3_symbol.py \
 根据完整 kernel banner 查找：
 
 ```bash
-python3 vol3-memory-analysis/scripts/resolve_vol3_symbol.py \
+python3 scripts/resolve_vol3_symbol.py \
   --banner 'Linux version ...' \
   --symbols-dir ./symbols/linux
 ```
@@ -214,7 +231,7 @@ Package revision: 6.12.90-2
 生成构建脚本：
 
 ```bash
-python3 vol3-memory-analysis/scripts/debian_snapshot_symbol_cmd.py \
+python3 scripts/debian_snapshot_symbol_cmd.py \
   --uname-release '6.12.90+deb13.1-amd64' \
   --package-revision '6.12.90-2' \
   --arch amd64 \
@@ -379,13 +396,13 @@ ls -lh images/
 
 ```bash
 python3 ~/.codex/skills/.system/skill-creator/scripts/quick_validate.py \
-  vol3-memory-analysis
+  .
 ```
 
 Python 脚本语法检查：
 
 ```bash
-python3 -m py_compile vol3-memory-analysis/scripts/*.py
+python3 -m py_compile scripts/*.py
 ```
 
 ## 数据来源
