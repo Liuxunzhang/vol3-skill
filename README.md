@@ -34,11 +34,12 @@
 │   └── workflows.md
 ├── scripts/
 │   ├── init_workspace.py
+│   ├── run_vol3.py
 │   ├── resolve_vol3_symbol.py
 │   └── debian_snapshot_symbol_cmd.py
 ├── images/                 # 默认内存镜像目录，不提交 Git
 ├── symbols/linux/          # Linux ISF 符号目录，不提交 Git
-├── results/                # 明确要求导出时的默认结果目录
+├── results/                # 插件输出、元数据和分析文档
 └── vol3-symbol-build/      # Debian 符号生成临时目录
 ```
 
@@ -138,7 +139,8 @@ ln -s "$(pwd)" ~/.codex/skills/vol3-memory-analysis
 |---|---|---|
 | 内存镜像 | `images/` | 未提供路径时优先查找 |
 | Linux 符号 | `symbols/linux/` | Volatility 使用 `-s symbols` |
-| 分析导出 | `results/` | 仅在用户明确要求导出时写入 |
+| 插件结果 | `results/` | 每次执行自动保存，兼容结果优先复用 |
+| 分析文档 | `results/<镜像名>-analysis.md` | 随调查过程持续更新 |
 | Debian 构建文件 | `vol3-symbol-build/` | 保存 debug deb、解包文件和临时 ISF |
 | Volatility 缓存 | `.cache/volatility3/` | 避免用户目录缓存不可写 |
 
@@ -152,34 +154,56 @@ ln -s "$(pwd)" ~/.codex/skills/vol3-memory-analysis
 source .venv/bin/activate
 ```
 
+推荐通过 Skill 自带执行器调用 Volatility。它会自动注入工作区绝对 cache 路径和 `-s <workspace>/symbols`，并将插件输出与元数据保存到 `results/`：
+
+```bash
+python3 scripts/run_vol3.py \
+  --workspace . \
+  --image images/dump.raw \
+  linux.pslist.PsList
+```
+
+再次执行相同命令时，执行器会先校验已有结果对应的镜像、符号、Volatility、插件参数和 renderer。完全一致时直接读取已有结果，不重复扫描镜像。需要强制刷新时添加 `--force`。
+
+只检查最终命令、不执行：
+
+```bash
+python3 scripts/run_vol3.py \
+  --workspace . \
+  --image images/dump.raw \
+  --dry-run \
+  linux.pslist.PsList
+```
+
 Linux 镜像首先获取 banner：
 
 ```bash
-.venv/bin/vol \
-  --cache-path .cache/volatility3 \
-  -s symbols \
-  -f images/dump.raw \
+python3 scripts/run_vol3.py \
+  --workspace . \
+  --image images/dump.raw \
   banners.Banners
 ```
+
+不要依赖 Volatility 自动搜索当前目录中的 `symbols/`。执行器会固定使用符号根目录 `symbols/`，而不是 `symbols/linux/`。
 
 符号解析成功后，可以按调查目的继续：
 
 ```bash
 # 活动进程
-.venv/bin/vol --cache-path .cache/volatility3 -s symbols \
-  -f images/dump.raw linux.pslist.PsList
+python3 scripts/run_vol3.py --workspace . --image images/dump.raw \
+  linux.pslist.PsList
 
 # 进程树
-.venv/bin/vol --cache-path .cache/volatility3 -s symbols \
-  -f images/dump.raw linux.pstree.PsTree
+python3 scripts/run_vol3.py --workspace . --image images/dump.raw \
+  linux.pstree.PsTree
 
 # 进程参数
-.venv/bin/vol --cache-path .cache/volatility3 -s symbols \
-  -f images/dump.raw linux.psaux.PsAux
+python3 scripts/run_vol3.py --workspace . --image images/dump.raw \
+  linux.psaux.PsAux
 
 # 活动套接字
-.venv/bin/vol --cache-path .cache/volatility3 -s symbols \
-  -f images/dump.raw linux.sockstat.Sockstat
+python3 scripts/run_vol3.py --workspace . --image images/dump.raw \
+  linux.sockstat.Sockstat
 ```
 
 插件名称会随 Volatility 3 版本变化。应先通过以下命令确认当前环境实际支持的名称：
@@ -265,19 +289,17 @@ https://github.com/volatilityfoundation/dwarf2json/releases/download/v0.9.0/dwar
 ## 验证符号表
 
 ```bash
-.venv/bin/vol \
-  --cache-path .cache/volatility3 \
-  -s symbols \
+python3 scripts/run_vol3.py \
+  --workspace . \
   isfinfo.IsfInfo
 ```
 
 随后运行一个基础插件验证符号和镜像是否匹配：
 
 ```bash
-.venv/bin/vol \
-  --cache-path .cache/volatility3 \
-  -s symbols \
-  -f images/dump.raw \
+python3 scripts/run_vol3.py \
+  --workspace . \
+  --image images/dump.raw \
   linux.pslist.PsList
 ```
 
@@ -312,41 +334,72 @@ Keyboard_notifiers/Tty_Check
 
 Rootkit 检查高度依赖精确符号。符号未验证时，插件异常只能作为低置信度线索。
 
-## 导出结果
+## 结果复用与分析文档
 
-默认只在终端返回摘要。明确要求导出时，将结果写入 `results/`：
-
-```bash
-mkdir -p results
-
-.venv/bin/vol \
-  --cache-path .cache/volatility3 \
-  -s symbols \
-  -f images/dump.raw \
-  -r csv \
-  linux.pslist.PsList \
-  > results/dump-pslist.csv
-```
-
-对于插件自身导出的文件，使用 Volatility 输出目录：
+执行器默认将插件标准输出写入 `results/`，同时保留终端输出。例如：
 
 ```bash
-.venv/bin/vol \
-  --cache-path .cache/volatility3 \
-  -s symbols \
-  -f images/dump.raw \
-  -o results/dump-files \
-  <plugin>
+python3 scripts/run_vol3.py \
+  --workspace . \
+  --image images/dump.raw \
+  linux.pslist.PsList
 ```
+
+典型产物：
+
+```text
+results/dump-linux.pslist.PsList.txt
+results/dump-linux.pslist.PsList.txt.meta.json
+results/dump-analysis.md
+```
+
+元数据用于判断结果是否仍与当前镜像、符号和命令匹配。Agent 后续分析必须先读取 `results/`，只有不存在兼容结果时才执行插件。失败输出会保留为 `*.failed.*`，但不会作为成功缓存复用。
+
+首次成功执行镜像插件时，执行器还会创建 `results/<镜像名>-analysis.md`，并维护其中的证据文件清单。Agent 负责继续填写和更新 Findings、Uncertainty、Next Steps 等分析内容。
+
+使用其他 renderer 时：
+
+```bash
+python3 scripts/run_vol3.py \
+  --workspace . \
+  --image images/dump.raw \
+  --renderer csv \
+  linux.pslist.PsList
+```
+
+插件自身需要导出文件时，使用 `--output-dir results/<目录>`。最终分析结论写入并持续更新 `results/<镜像名>-analysis.md`，其中应注明引用的插件结果文件、事实、推断、置信度和待确认事项。
 
 ## 常见问题
 
 ### Volatility 找不到符号
 
 - 确认符号位于 `symbols/linux/*.json.xz`。
-- 参数应为 `-s symbols`，而不是 `-s symbols/linux`。
+- 每条 Volatility 命令都必须显式包含绝对路径 `-s "$WORKSPACE_ROOT/symbols"`。
+- 参数指向符号根目录，不能使用 `-s "$WORKSPACE_ROOT/symbols/linux"`。
 - 用 `isfinfo.IsfInfo` 检查 banner identifying information。
 - 确认 ISF 是通过匹配的 `vmlinux` 生成。
+
+### `pslist` 提示 translation layer 未建立
+
+不要立即重新下载或生成符号。按以下顺序检查：
+
+```bash
+python3 scripts/run_vol3.py \
+  --workspace . \
+  isfinfo.IsfInfo
+
+python3 scripts/run_vol3.py \
+  --workspace . \
+  --image images/dump.raw \
+  banners.Banners
+
+python3 scripts/run_vol3.py \
+  --workspace . \
+  --image images/dump.raw \
+  linux.pslist.PsList
+```
+
+如果本地存在 `Debian_6.12.90+deb13.1-amd64_6.12.90-2_amd64.json.xz`，仍需确认 `isfinfo` 能加载它，并且其 identifying banner 与内存中的 banner 一致。文件名完全匹配不等于 ISF 内容必然兼容。
 
 ### ELF-only ISF 无法识别
 

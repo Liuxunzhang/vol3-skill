@@ -2,11 +2,16 @@
 
 ## Unknown Image Triage
 
-1. If no image path is supplied, inspect `images/` and select the only plausible image or ask the user to choose.
-2. Run `banners` and/or `windows.info` based on the suspected OS.
-3. Resolve symbols if Volatility3 cannot construct required layers.
-4. Establish baseline processes and network state.
-5. Ask what is abnormal for the host role before labeling activity malicious.
+1. Resolve the workspace, image, cache, and symbol paths to absolute paths.
+2. Inspect `<workspace>/results/` and read relevant existing plugin outputs and metadata before executing anything.
+3. Use `<skill-dir>/scripts/run_vol3.py` for every supported plugin invocation so output is persisted and compatible results are reused.
+4. If no image path is supplied, inspect `<workspace>/images/` and select the only plausible image or ask the user to choose.
+5. Run or reuse `banners.Banners` and/or `windows.info.Info` based on the suspected OS.
+6. For Linux, run or reuse `isfinfo.IsfInfo` before the first symbol-dependent plugin.
+7. If layer construction fails, check the explicit `-s` path and local ISF compatibility before resolving new symbols.
+8. Establish baseline processes and network state.
+9. Update `<workspace>/results/<image-basename>-analysis.md` with evidence sources, findings, uncertainty, and next steps.
+10. Ask what is abnormal for the host role before labeling activity malicious.
 
 ## Suspicious Process
 
@@ -44,4 +49,4 @@ Keep conclusions tied to plugin evidence:
 - `Medium confidence`: one strong artifact plus plausible context.
 - `Low confidence`: plugin anomaly, symbol issue, or single weak indicator needing validation.
 
-Only write files when export is explicitly requested. Use `results/` by default for exported plugin output, dumps, timelines, and reports.
+Every plugin output and analysis report must be written under `results/`. Before running a plugin, inspect existing results and let `run_vol3.py` reuse a compatible result. The report filename is `<image-basename>-analysis.md`; cite the plugin result filenames used for each conclusion.

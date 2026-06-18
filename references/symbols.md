@@ -1,11 +1,28 @@
 # Volatility3 Symbols
 
-## Existing ISF Lookup
+## Mandatory Symbol Path
 
-For Linux and macOS, start with the kernel banner:
+Never rely on Volatility to discover a workspace-local symbol directory implicitly. Resolve the workspace root and pass the symbol root explicitly on every invocation:
 
 ```bash
-python3 vol.py -r pretty -f sample.bin banners
+python3 <skill-dir>/scripts/run_vol3.py \
+  --workspace <workspace> \
+  --image images/dump.raw \
+  banners.Banners
+```
+
+The runner injects `--cache-path <workspace>/.cache/volatility3` and `-s <workspace>/symbols` using absolute paths. For a direct Volatility call, use the same symbol root, not `<workspace>/symbols/linux`.
+
+## Existing ISF Lookup
+
+For Linux and macOS, start with the kernel banner using the mandatory command prefix:
+
+```bash
+<vol> --cache-path <workspace>/.cache/volatility3 \
+  -s <workspace>/symbols \
+  -r pretty \
+  -f <workspace>/images/sample.bin \
+  banners.Banners
 ```
 
 Then use `scripts/resolve_vol3_symbol.py` to query the public ISF banner mapping from `Abyss-W4tcher/volatility3-symbols` and print an install command. That repository stores common compressed ISF files and documents placing `.json.xz` files in:
@@ -17,7 +34,12 @@ Then use `scripts/resolve_vol3_symbol.py` to query the public ISF banner mapping
 Volatility3 can also query the remote ISF index directly:
 
 ```bash
-python3 vol.py --remote-isf-url 'https://github.com/Abyss-W4tcher/volatility3-symbols/raw/master/banners/banners.json' -f <memory_dump> <plugin>
+<vol> \
+  --cache-path <workspace>/.cache/volatility3 \
+  -s <workspace>/symbols \
+  --remote-isf-url 'https://github.com/Abyss-W4tcher/volatility3-symbols/raw/master/banners/banners.json' \
+  -f <workspace>/images/<memory_dump> \
+  <plugin>
 ```
 
 Use local downloads for repeatable investigations or offline work.
@@ -89,3 +111,37 @@ Do not substitute `System.map` for DWARF debug information; it is insufficient b
 - Volatility `isfinfo` may URL-encode `+` as `%2B`; this is display encoding, not a filename problem.
 - Generated ISF files should be placed under the symbol root as `symbols/linux/<name>.json.xz`, and Volatility should be run with `-s symbols`, not `-s symbols/linux`.
 - If the default Volatility cache is not writable, pass a workspace cache such as `--cache-path .cache/volatility3`.
+
+## Translation Layer Diagnostic Order
+
+An exact-looking ISF filename does not prove Volatility loaded it or that its identifying banner matches the image. For errors such as unsatisfied `kernel.layer_name` or `kernel.symbol_table_name`, use this order:
+
+1. Retry the failed command with absolute `--cache-path` and `-s <workspace>/symbols`.
+2. Confirm the file is readable under `<workspace>/symbols/linux/*.json.xz`.
+3. List recognized ISFs:
+
+   ```bash
+   <vol> --cache-path <workspace>/.cache/volatility3 \
+     -s <workspace>/symbols \
+     isfinfo.IsfInfo
+   ```
+
+4. Recover the image banner with the same prefix:
+
+   ```bash
+   <vol> --cache-path <workspace>/.cache/volatility3 \
+     -s <workspace>/symbols \
+     -f <workspace>/images/dump.raw \
+     banners.Banners
+   ```
+
+5. Compare the banner recovered from memory with the ISF identifying information. Filename equality is supporting context only.
+6. If the ISF was newly copied and Volatility still does not recognize it, retry with a fresh workspace cache directory before rebuilding:
+
+   ```bash
+   <vol> --cache-path <workspace>/.cache/volatility3-fresh \
+     -s <workspace>/symbols \
+     isfinfo.IsfInfo
+   ```
+
+Only search GitHub or generate a Debian ISF after these checks show that no compatible local ISF is available.
