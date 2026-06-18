@@ -39,7 +39,8 @@
 │   └── debian_snapshot_symbol_cmd.py
 ├── images/                 # 默认内存镜像目录，不提交 Git
 ├── symbols/linux/          # Linux ISF 符号目录，不提交 Git
-├── results/                # 插件输出、元数据和分析文档
+├── results/
+│   └── <kernel-release>/   # 按镜像内核分类的插件输出、元数据和分析文档
 └── vol3-symbol-build/      # Debian 符号生成临时目录
 ```
 
@@ -139,8 +140,8 @@ ln -s "$(pwd)" ~/.codex/skills/vol3-memory-analysis
 |---|---|---|
 | 内存镜像 | `images/` | 未提供路径时优先查找 |
 | Linux 符号 | `symbols/linux/` | Volatility 使用 `-s symbols` |
-| 插件结果 | `results/` | 每次执行自动保存，兼容结果优先复用 |
-| 分析文档 | `results/<镜像名>-analysis.md` | 随调查过程持续更新 |
+| 插件结果 | `results/<内核版本>/` | 每次执行自动保存，兼容结果优先复用 |
+| 分析文档 | `results/<内核版本>/<镜像名>-analysis.md` | 随调查过程持续更新 |
 | Debian 构建文件 | `vol3-symbol-build/` | 保存 debug deb、解包文件和临时 ISF |
 | Volatility 缓存 | `.cache/volatility3/` | 避免用户目录缓存不可写 |
 
@@ -154,7 +155,7 @@ ln -s "$(pwd)" ~/.codex/skills/vol3-memory-analysis
 source .venv/bin/activate
 ```
 
-推荐通过 Skill 自带执行器调用 Volatility。它会自动注入工作区绝对 cache 路径和 `-s <workspace>/symbols`，并将插件输出与元数据保存到 `results/`：
+推荐通过 Skill 自带执行器调用 Volatility。它会自动注入工作区绝对 cache 路径和 `-s <workspace>/symbols`，并将插件输出与元数据保存到对应内核目录，例如 `results/6.12.90+deb13.1-amd64/`：
 
 ```bash
 python3 scripts/run_vol3.py \
@@ -260,7 +261,7 @@ python3 scripts/debian_snapshot_symbol_cmd.py \
   --package-revision '6.12.90-2' \
   --arch amd64 \
   --symbols-dir ./symbols/linux \
-  --script-out ./results/build-debian-6.12.90-symbol.sh
+  --script-out ./results/6.12.90+deb13.1-amd64/build-debian-6.12.90-symbol.sh
 ```
 
 该命令会查询 Debian Snapshot 并生成脚本，但不会自动安装内核包，也不会修改运行中的内核。
@@ -268,7 +269,7 @@ python3 scripts/debian_snapshot_symbol_cmd.py \
 审核脚本后执行：
 
 ```bash
-bash results/build-debian-6.12.90-symbol.sh
+bash results/6.12.90+deb13.1-amd64/build-debian-6.12.90-symbol.sh
 ```
 
 生成脚本将执行以下操作：
@@ -291,6 +292,7 @@ https://github.com/volatilityfoundation/dwarf2json/releases/download/v0.9.0/dwar
 ```bash
 python3 scripts/run_vol3.py \
   --workspace . \
+  --image images/dump.raw \
   isfinfo.IsfInfo
 ```
 
@@ -336,7 +338,7 @@ Rootkit 检查高度依赖精确符号。符号未验证时，插件异常只能
 
 ## 结果复用与分析文档
 
-执行器默认将插件标准输出写入 `results/`，同时保留终端输出。例如：
+执行器默认将插件标准输出写入 `results/<kernel-release>/`，同时保留终端输出。例如：
 
 ```bash
 python3 scripts/run_vol3.py \
@@ -348,14 +350,16 @@ python3 scripts/run_vol3.py \
 典型产物：
 
 ```text
-results/dump-linux.pslist.PsList.txt
-results/dump-linux.pslist.PsList.txt.meta.json
-results/dump-analysis.md
+results/6.12.90+deb13.1-amd64/dump-linux.pslist.PsList.txt
+results/6.12.90+deb13.1-amd64/dump-linux.pslist.PsList.txt.meta.json
+results/6.12.90+deb13.1-amd64/dump-analysis.md
 ```
 
-元数据用于判断结果是否仍与当前镜像、符号和命令匹配。Agent 后续分析必须先读取 `results/`，只有不存在兼容结果时才执行插件。失败输出会保留为 `*.failed.*`，但不会作为成功缓存复用。
+执行器从 Linux 镜像 banner 提取内核 release；Windows 镜像则从 `windows.info.Info` 提取 NT 版本、build 和产品类型，例如 `results/windows-10.0.26100-server/`。Windows PDB GUID/Age 只用于精确匹配符号，不再作为面向用户的结果目录名。映射保存在 `results/.vol3-cases.json`；系统版本尚未获得时，结果暂存在 `results/_unidentified-kernel/<镜像名>/`，识别成功后自动迁移到正式目录。
 
-首次成功执行镜像插件时，执行器还会创建 `results/<镜像名>-analysis.md`，并维护其中的证据文件清单。Agent 负责继续填写和更新 Findings、Uncertainty、Next Steps 等分析内容。
+元数据用于判断结果是否仍与当前镜像、符号和命令匹配。Agent 后续分析必须先读取对应内核目录，只有不存在兼容结果时才执行插件。失败输出会保留为 `*.failed.*`，但不会作为成功缓存复用。
+
+首次成功执行镜像插件时，执行器还会创建 `results/<内核版本>/<镜像名>-analysis.md`，并维护其中的证据文件清单。Agent 负责继续填写和更新 Findings、Uncertainty、Next Steps 等分析内容。
 
 使用其他 renderer 时：
 
@@ -367,7 +371,7 @@ python3 scripts/run_vol3.py \
   linux.pslist.PsList
 ```
 
-插件自身需要导出文件时，使用 `--output-dir results/<目录>`。最终分析结论写入并持续更新 `results/<镜像名>-analysis.md`，其中应注明引用的插件结果文件、事实、推断、置信度和待确认事项。
+插件自身需要导出文件时，使用相对目录，例如 `--output-dir dumped-files`，执行器会将其放到当前内核结果目录。最终分析结论写入并持续更新 `results/<内核版本>/<镜像名>-analysis.md`，其中应注明引用的插件结果文件、事实、推断、置信度和待确认事项。
 
 ## 常见问题
 
@@ -386,6 +390,7 @@ python3 scripts/run_vol3.py \
 ```bash
 python3 scripts/run_vol3.py \
   --workspace . \
+  --image images/dump.raw \
   isfinfo.IsfInfo
 
 python3 scripts/run_vol3.py \

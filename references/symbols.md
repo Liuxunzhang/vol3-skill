@@ -75,7 +75,7 @@ python3 scripts/debian_snapshot_symbol_cmd.py \
   --package-revision '6.12.90-2' \
   --arch amd64 \
   --symbols-dir ./symbols/linux \
-  --script-out ./results/build-debian-6.12.90-symbol.sh
+  --script-out ./results/6.12.90+deb13.1-amd64/build-debian-6.12.90-symbol.sh
 ```
 
 Use the prebuilt `dwarf2json` binary unless the user explicitly asks to build from source:
@@ -123,6 +123,7 @@ An exact-looking ISF filename does not prove Volatility loaded it or that its id
    ```bash
    <vol> --cache-path <workspace>/.cache/volatility3 \
      -s <workspace>/symbols \
+     -f <workspace>/images/dump.raw \
      isfinfo.IsfInfo
    ```
 
@@ -141,6 +142,7 @@ An exact-looking ISF filename does not prove Volatility loaded it or that its id
    ```bash
    <vol> --cache-path <workspace>/.cache/volatility3-fresh \
      -s <workspace>/symbols \
+     -f <workspace>/images/dump.raw \
      isfinfo.IsfInfo
    ```
 

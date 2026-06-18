@@ -3,14 +3,14 @@
 ## Unknown Image Triage
 
 1. Resolve the workspace, image, cache, and symbol paths to absolute paths.
-2. Inspect `<workspace>/results/` and read relevant existing plugin outputs and metadata before executing anything.
+2. Determine the target kernel from the image banner or `results/.vol3-cases.json`, then inspect `<workspace>/results/<kernel-release>/` before executing anything.
 3. Use `<skill-dir>/scripts/run_vol3.py` for every supported plugin invocation so output is persisted and compatible results are reused.
 4. If no image path is supplied, inspect `<workspace>/images/` and select the only plausible image or ask the user to choose.
 5. Run or reuse `banners.Banners` and/or `windows.info.Info` based on the suspected OS.
-6. For Linux, run or reuse `isfinfo.IsfInfo` before the first symbol-dependent plugin.
+6. For Linux, run or reuse `isfinfo.IsfInfo` before the first symbol-dependent plugin and pass the target image to the runner so the result is classified with that image.
 7. If layer construction fails, check the explicit `-s` path and local ISF compatibility before resolving new symbols.
 8. Establish baseline processes and network state.
-9. Update `<workspace>/results/<image-basename>-analysis.md` with evidence sources, findings, uncertainty, and next steps.
+9. Update `<workspace>/results/<kernel-release>/<image-basename>-analysis.md` with evidence sources, findings, uncertainty, and next steps.
 10. Ask what is abnormal for the host role before labeling activity malicious.
 
 ## Suspicious Process
@@ -49,4 +49,4 @@ Keep conclusions tied to plugin evidence:
 - `Medium confidence`: one strong artifact plus plausible context.
 - `Low confidence`: plugin anomaly, symbol issue, or single weak indicator needing validation.
 
-Every plugin output and analysis report must be written under `results/`. Before running a plugin, inspect existing results and let `run_vol3.py` reuse a compatible result. The report filename is `<image-basename>-analysis.md`; cite the plugin result filenames used for each conclusion.
+Every plugin output and analysis report must be written under `results/<kernel-release>/`. Before running a plugin, inspect that kernel directory and let `run_vol3.py` reuse a compatible result. The report filename is `<image-basename>-analysis.md`; cite the plugin result filenames used for each conclusion. Output under `results/_unidentified-kernel/` is temporary and must be classified after banner discovery.
