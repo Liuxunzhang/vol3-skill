@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vol3 Memory Analysis"
+  short_description: "Volatility3 memory analysis workflows"
+  default_prompt: "Use $vol3-memory-analysis to analyze a memory image with Volatility3 and choose plugins deliberately."

@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Volatility caches and local tools
+.cache/
+.tools/
+
+# Memory images and forensic evidence
+images/
+*.raw
+*.mem
+*.lime
+*.vmem
+*.dmp
+*.dump
+*.core
+*.aff4
+
+# Generated symbols and temporary Debian build data
+symbols/
+vol3-symbol-build/
+*.json.xz
+*.deb
+
+# Analysis output
+results/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
+*.swo
+*~
+
+# IDE and OS metadata
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
